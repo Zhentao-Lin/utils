@@ -1,3 +1,26 @@
+# Description
+This repository is derived from [raspberrypi/utils](https://github.com/raspberrypi/utils), and further encapsulates the ws2812, pwm, and servo libraries based on this.
+
+****
+The specific modifications are as follows:
+1. Added [freenove_ws2812.h](file://e:\GitHub\utils\piolib\examples\freenove_ws2812.h) and [freenove_ws2812.c](file://e:\GitHub\utils\piolib\examples\freenove_ws2812.c) in `utils/piolib/examples` for the freenove_ws2812 library
+2. Added [freenove_pwm.h](file://e:\GitHub\utils\piolib\examples\freenove_pwm.h) and [freenove_pwm.c](file://e:\GitHub\utils\piolib\examples\freenove_pwm.c) in `utils/piolib/examples` for the freenove_pwm library
+3. Modified [CMakeLists.txt](file://e:\GitHub\utils\CMakeLists.txt) in `utils/piolib/examples` to generate shared libraries and test files
+4. Added [setup.py](file://e:\GitHub\utils\python\setup.py) in `utils/python` to set up the Python environment, compile code and generate shared libraries
+5. Added [piolib_ws2812.py](file://e:\GitHub\utils\python\piolib_ws2812.py) in `utils/python` for the freenove_ws2812 library
+6. Added [piolib_pwm.py](file://e:\GitHub\utils\python\piolib_pwm.py) in `utils/python` for the freenove_pwm library
+7. Added [piolib_servo.py](file://e:\GitHub\utils\python\piolib_servo.py) in `utils/python` for the freenove_servo library
+8. Added [ws2812_demo.py](file://e:\GitHub\utils\python\ws2812_demo.py), [pwm_demo.py](file://e:\GitHub\utils\python\pwm_demo.py) and [servo_demo.py](file://e:\GitHub\utils\python\servo_demo.py) in `utils/python` to test the freenove_ws2812, freenove_pwm, and freenove_servo libraries
+
+# Usage
+1. Clone the repository: `cd ~ && git clone https://github.com/Zhentao-Lin/utils.git`
+2. Install build tools, compile the code to generate shared libraries, and install the shared libraries to the Raspberry Pi 5 directory: `cd utils/python/ && sudo python setup.py`
+3. Test: 
+* Navigate to the python directory: `cd ~/utils/python`
+* Test WS2812 LED driver: `python ws2812_demo.py`
+* Test PWM driver: `python pwm_demo.py`
+* Test servo driver: `python servo_demo.py`
+
 # utils
 A collection of scripts and simple applications
 

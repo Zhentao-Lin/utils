@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include "rpieepromab.h"
 
-#define PARTITION_NUM_TO_STRING(P) (P == RPI_EEPROM_AB_PARTITION_A ? "A" : "B")
+#define PARTITION_NUM_TO_STRING(P) (P == RPI_EEPROM_AB_PARTITION_A ? "A" : (P == RPI_EEPROM_AB_PARTITION_B ? "B" : "Unknown"))
 
 /* Print the usage message */
 static void usage(const char *progname, int exit_status) {
@@ -44,7 +44,8 @@ static void usage(const char *progname, int exit_status) {
         "                                 selections and their hashes\n"
         "  status-at-boot                 Get the partition used at boot and the\n"
         "                                 committed status at boot\n"
-        "  help                           Show this help message\n",
+        "  help                           Show this help message\n"
+        "  version                        Show version information\n",
         progname);
     exit(exit_status);
 }
@@ -68,43 +69,8 @@ static int hex2bin(const char *hexstr, uint8_t *bin, size_t bin_len) {
     return 0;
 }
 
-/* Wait for the write to the EEPROM to complete */
-static int wait_for_eeprom_update_write(void) {
-    RPI_EEPROM_AB_ERROR err;
-    RPI_EEPROM_AB_UPDATE_RC_STATUS status;
-    RPI_EEPROM_AB_ERROR firmware_error;
-    int max_wait = 15;
-
-    printf("Waiting for write to EEPROM to complete\n");
-    for (int i = 0; i < max_wait; i++) {
-        uint32_t _spi_gpio_check, _using_partitioning;
-
-        err = rpi_eeprom_ab_update_get_status(&status, &firmware_error,
-            &_spi_gpio_check, &_using_partitioning);
-        if (err != RPI_EEPROM_AB_ERROR_NO_ERROR){
-            printf("Failed to get EEPROM update status: %s\n",
-                rpi_eeprom_ab_update_strerror(err));
-            return -1;
-        } else {
-            if (status == RPI_EEPROM_AB_UPDATE_RC_SUCCSESS) {
-                printf("\nCompleted\n");
-                break;
-            } else if (status == RPI_EEPROM_AB_UPDATE_RC_BUSY) {
-                printf("."); fflush(stdout);
-            } else {
-                printf("EEPROM update firmware error: %s\n",
-                    rpi_eeprom_ab_update_strerror(firmware_error));
-                return -1;
-            }
-        }
-        sleep(1);
-    }
-    return 0;
-}
-
 static int cmd_write_eeprom_update(int argc, char *argv[]) {
     RPI_EEPROM_AB_ERROR err;
-    int ret = -1;
     const char *update_filename = NULL;
     FILE *f;
     uint8_t update_data[RPI_EEPROM_AB_PARTITION_SIZE];
@@ -149,7 +115,17 @@ static int cmd_write_eeprom_update(int argc, char *argv[]) {
     }
 
     fclose(f);
-    err = rpi_eeprom_ab_write_eeprom_update(update_data, file_size);
+
+    // Cancel any existing update
+    err = rpi_eeprom_ab_update_cancel();
+    if (err != RPI_EEPROM_AB_ERROR_NO_ERROR) {
+        printf("Failed to cancel existing update: %s\n",
+            rpi_eeprom_ab_update_strerror(err));
+        return -1;
+    }
+
+    err = rpi_eeprom_ab_write_eeprom_update(update_data, file_size, 1);
+    printf("\n");
     if (err != RPI_EEPROM_AB_ERROR_NO_ERROR) {
         if (err == RPI_EEPROM_AB_ERROR_BUSY) {
             printf("Failed to write update. EEPROM is busy.\n");
@@ -158,17 +134,33 @@ static int cmd_write_eeprom_update(int argc, char *argv[]) {
             printf("Failed to write update. Cannot write from an uncommitted partition.\n");
             return -1;
         }
-        printf("Failed to write update: %s\n", rpi_eeprom_ab_update_strerror(ret));
+        printf("Failed to write update: %s\n", rpi_eeprom_ab_update_strerror(err));
         return -1;
     }
 
-    ret = wait_for_eeprom_update_write();
-    if (ret < 0) {
-        printf("Failed to wait for write to EEPROM to complete\n");
+    RPI_EEPROM_AB_UPDATE_RC_STATUS status;
+    RPI_EEPROM_AB_ERROR firmware_error;
+    uint32_t _spi_gpio_check, _using_partitioning;
+
+    err = rpi_eeprom_ab_update_get_status(&status, &firmware_error,
+        &_spi_gpio_check, &_using_partitioning);
+    if (err != RPI_EEPROM_AB_ERROR_NO_ERROR){
+        printf("Failed to get EEPROM update status: %s\n",
+            rpi_eeprom_ab_update_strerror(err));
         return -1;
+    } else {
+        if (status == RPI_EEPROM_AB_UPDATE_RC_SUCCSESS) {
+            printf("Write to EEPROM completed\n");
+        } else if (status == RPI_EEPROM_AB_UPDATE_RC_BUSY) {
+            printf("Write to EEPROM did not complete\n");
+            return -1;
+        } else {
+            printf("EEPROM update firmware error: %s\n",
+                rpi_eeprom_ab_update_strerror(firmware_error));
+            return -1;
+        }
     }
 
-    printf("Write to EEPROM completed\n");
     return 0;
 }
 
@@ -267,6 +259,12 @@ int main(int argc, char *argv[]) {
             strcmp(argv[1], "-h") == 0 || 
             strcmp(argv[1], "help") == 0) {
         usage(argv[0], 0);
+        return 0;
+    } else if (strcmp(argv[1], "--version") == 0 ||
+            strcmp(argv[1], "-v") == 0 ||
+            strcmp(argv[1], "version") == 0) {
+        printf("rpi-eeprom-ab %s\n", VERSION_STRING);
+        printf("librpieepromab %s\n", rpi_eeprom_ab_version());
         return 0;
     } else if (strcmp(argv[1], "update") == 0) {
         // Update the EEPROM partition with the contents of the file
